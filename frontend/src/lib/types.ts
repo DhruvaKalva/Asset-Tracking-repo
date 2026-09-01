@@ -382,3 +382,29 @@ export interface EventFrame {
   payload: Record<string, unknown>;
   occurred_at: string;
 }
+
+/* -- Mira, the dashboard assistant -------------------------------------- */
+
+export interface MiraMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface MiraToolCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface MiraReply {
+  reply: string;
+  /** Which read-models produced the answer, so a number can be traced. */
+  tools_used: MiraToolCall[];
+  model: string;
+  usage: Record<string, number>;
+}
+
+export interface MiraHealth {
+  configured: boolean;
+  model: string | null;
+  tools: string[];
+}

@@ -20,6 +20,7 @@ from app.api import (
     alerts,
     analytics,
     assets,
+    mira,
     registry,
     rentals,
     stream,
@@ -28,6 +29,7 @@ from app.api import (
 )
 from app.config import settings
 from app.db import SessionLocal, init_db
+from app.domain import mira as mira_domain
 from app.domain.errors import DomainError
 from app.workers import scheduler
 
@@ -103,6 +105,7 @@ app.include_router(alerts.router, prefix=API)
 app.include_router(analytics.router, prefix=API)
 app.include_router(admin.router, prefix=API)
 app.include_router(stream.router, prefix=API)
+app.include_router(mira.router, prefix=API)
 
 
 @app.get("/health")
@@ -112,6 +115,7 @@ def health():
         "database": settings.database_url.split("://", 1)[0],
         "simulator": settings.simulator_enabled,
         "sse_subscribers": bus.subscriber_count,
+        "mira": mira_domain.configured(),
     }
 
 

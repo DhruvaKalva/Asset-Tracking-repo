@@ -272,3 +272,31 @@ class TrackPoint(BaseModel):
     at: datetime
     source: str
     event_type: str
+
+
+# --------------------------------------------------------------------------
+# Mira -- dashboard assistant
+# --------------------------------------------------------------------------
+class MiraMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
+class MiraRequest(BaseModel):
+    """The client owns the transcript and posts it back; the server keeps none."""
+
+    messages: list[MiraMessage] = Field(..., min_length=1, max_length=40)
+
+
+class MiraToolCall(BaseModel):
+    name: str
+    args: dict = {}
+
+
+class MiraReply(BaseModel):
+    reply: str
+    # Surfaced in the UI so the answer is auditable: the reader can see which
+    # read-model produced the number they are being told.
+    tools_used: list[MiraToolCall] = []
+    model: str
+    usage: dict = {}

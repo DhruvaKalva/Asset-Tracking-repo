@@ -8,6 +8,7 @@ import { useAuth } from "@/store/auth";
 import { useTheme } from "@/store/ui";
 import { useOverview } from "@/hooks/queries";
 import { SeverityChip } from "@/components/primitives";
+import { Mira } from "@/components/Mira";
 import { timeAgo } from "@/lib/format";
 
 const NAV = [
@@ -95,8 +96,9 @@ export function Layout() {
         <Outlet />
       </main>
 
-      {/* Alert toasts, pushed straight off the SSE stream. */}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
+      {/* Alert toasts, pushed straight off the SSE stream. Stacked above the
+          Mira orb rather than under it, so neither one buries the other. */}
+      <div className="pointer-events-none fixed bottom-4 right-24 z-40 flex w-80 flex-col gap-2">
         {toasts.map((t, i) => (
           <button
             key={toastKey(t, i)}
@@ -114,6 +116,8 @@ export function Layout() {
           </button>
         ))}
       </div>
+
+      <Mira />
     </div>
   );
 }

@@ -21,6 +21,9 @@ import type {
   IdleCostRow,
   MaintenanceRow,
   MapSnapshot,
+  MiraHealth,
+  MiraMessage,
+  MiraReply,
   Operator,
   Overview,
   Recommendation,
@@ -291,5 +294,23 @@ export function useSimulator() {
   return useMutation({
     mutationFn: (action: "pause" | "resume" | "tick") => api.post<unknown>("/api/admin/simulator/" + action),
     onSuccess: () => invalidateFleet(qc),
+  });
+}
+
+/**
+ * Mira. The transcript lives in the component, not here: the server is
+ * stateless, so each turn posts the whole conversation and gets one reply.
+ * That is a mutation, not a query -- there is nothing to cache or refetch.
+ */
+export const useMiraHealth = () =>
+  useQuery({
+    queryKey: ["mira", "health"],
+    queryFn: () => api.get<MiraHealth>("/api/mira/health"),
+    staleTime: Infinity, // config, not data: it changes on restart, not on tick
+  });
+
+export function useMira() {
+  return useMutation({
+    mutationFn: (messages: MiraMessage[]) => api.post<MiraReply>("/api/mira/chat", { messages }),
   });
 }

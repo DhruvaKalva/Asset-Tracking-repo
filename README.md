@@ -137,6 +137,17 @@ rental-shaped branches (overdue, expected return, operator) that mean nothing fo
 a machine bolted to a slab. A fixed asset with no site is rejected at creation,
 because it could never be placed on the map.
 
+**The assistant reads the same read-models as the screen.** Mira, the sphere in
+the bottom-right corner, is a Gemini model given seven query tools -- and only
+those seven, all of which read this fleet. She is never asked to recall anything
+about the fleet from training, and every turn carries a fresh snapshot of it, so
+her answers agree with the dashboard by construction rather than by luck. An
+off-topic question has no tool to reach for, which is why the scope holds
+without a keyword filter policing it. None of the tools write: she can tell you
+that EQX1002 is unaccounted for and what it is costing, but she cannot check it
+in. She is off unless `GEMINI_API_KEY` is set, and the button hides itself when
+she cannot answer.
+
 **A day cannot exceed 24 hours.** Enforced at ingest, so a fast or retrying
 source cannot produce impossible rows that then poison every downstream z-score.
 

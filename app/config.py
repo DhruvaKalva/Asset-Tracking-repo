@@ -25,6 +25,17 @@ class Settings(BaseSettings):
     media_root: str = "./media"
     max_photo_mb: float = 8.0
 
+    # Mira -- the dashboard assistant, backed by Google Gemini.
+    # No key means no Mira: the endpoint reports itself unconfigured and the
+    # UI hides the button rather than offering something that cannot answer.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_timeout_seconds: float = 30.0
+    # Each round is one model call plus the tool results it asked for. Four is
+    # enough for "which assets are overdue, and what do they cost me" and low
+    # enough that a confused model cannot spin.
+    mira_max_tool_rounds: int = 4
+
     # business rules
     idle_ratio_threshold: float = 0.70
     idle_streak_days: int = 3

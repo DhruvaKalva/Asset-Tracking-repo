@@ -141,9 +141,59 @@ an empty `.env` still runs.
 | `IDLE_RATIO_THRESHOLD` | `0.70` | Above this, an asset reads as excessively idle |
 | `STALE_PING_HOURS` | `48` | Beyond this with no ping, an asset reads unaccounted |
 | `OVERDUE_REMINDER_DAYS` | `3` | Lead time on due-soon alerts |
+| `GEMINI_API_KEY` | *(empty)* | Enables Mira, the assistant. Empty means no Mira |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Any model your key can reach |
 
 The frontend has its own `frontend/.env.example`. You only need it when hosting
 the frontend separately from the API — in development the Vite proxy handles it.
+
+---
+
+## Mira, the dashboard assistant
+
+The blue sphere in the bottom-right corner is Mira. She answers questions about
+the fleet — utilisation, overdue hires, idle cost, what needs servicing — from
+the same live data the dashboard renders.
+
+**She is off by default.** She needs a Google Gemini API key:
+
+1. Get one from [Google AI Studio](https://aistudio.google.com/apikey).
+2. Put it in `.env`:
+
+```bash
+GEMINI_API_KEY=your-key-here
+```
+
+3. Restart the backend. `GET /health` should now report `"mira": true`.
+
+Without a key the endpoint reports itself unconfigured and the button does not
+render at all — an assistant that cannot answer is worse than no assistant, so
+it does not advertise itself.
+
+**The key is never committed.** `.env` is gitignored, so a fresh clone on
+another machine has no Mira until someone sets a key there too. That is
+deliberate: keys belong to machines, not to repositories.
+
+### What she can and cannot do
+
+She has exactly seven tools, and all seven read this fleet: fleet overview,
+asset search, one asset's record, open alerts, utilisation, cost analysis, and
+the site list. There is no tool for anything else, so an off-topic question has
+nothing to draw on and she declines it in a line. She is told never to state a
+figure that did not come from those tools or from the live snapshot attached to
+every turn, so she cannot narrate a number that is not on screen.
+
+She reads. She cannot check an asset in or out, raise or resolve an alert, or
+change any record — the tools are queries, and none of them write.
+
+Every answer shows which read-models produced it as small chips beneath the
+reply, and equipment ids in her answers link straight to the asset page.
+
+### Cost
+
+Each turn sends a roughly 1,500-character fleet snapshot plus the conversation
+so far — about 1,600–5,000 tokens depending on how many tools she needs. Most
+questions are answered from the snapshot alone, with no tool call at all.
 
 ---
 
@@ -199,8 +249,15 @@ Almost always Python 3.12+. The pinned `numpy==1.26.4` has no wheel for it and
 tries to build from source. Use 3.10 or 3.11.
 
 **Port already in use**
-`uvicorn app.main:app --port 8001` — then set `VITE_PROXY_TARGET=http://127.0.0.1:8001`
-in `frontend/.env` so the proxy follows.
+`uvicorn app.main:app --port 8001` — then point the dev proxy at it. This must
+be a real environment variable, not a `.env` entry: `vite.config.ts` reads
+`process.env`, which Vite does not populate from `.env` files.
+
+```bash
+VITE_PROXY_TARGET=http://127.0.0.1:8001 npm run dev --prefix frontend
+```
+
+On PowerShell: `$env:VITE_PROXY_TARGET="http://127.0.0.1:8001"` first.
 
 **The map is blank but the rest of the page renders.**
 The basemap is OpenStreetMap raster tiles, so the map needs internet access at
@@ -212,6 +269,18 @@ Node is too old. Use 20 LTS or newer.
 **Dashboard numbers look frozen.**
 Check `curl http://localhost:8000/api/admin/jobs` — if `running` is false the
 scheduler died. Restart the API.
+
+**The "Ask Mira" sphere is missing.**
+No API key. `curl http://localhost:8000/api/mira/health` — if `configured` is
+false, set `GEMINI_API_KEY` in `.env` and restart the backend. The button is
+hidden on purpose when she cannot answer.
+
+**Mira says the key was rejected.**
+The key is wrong, revoked, or from a project without the Generative Language
+API enabled. Check it at [Google AI Studio](https://aistudio.google.com/apikey).
+
+**Mira says there is no such model.**
+Your key cannot reach `GEMINI_MODEL`. Set it to a model the key can use.
 
 **Schema errors after pulling new code**
 `init_db()` applies additive column migrations on boot, so restarting the API

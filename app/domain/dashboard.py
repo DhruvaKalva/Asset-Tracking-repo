@@ -55,8 +55,10 @@ def list_assets(
     for eid, eq in equipment.items():
         state = states.get(eid)
         rental = rentals.get(eid)
-        site_id = (state.site_id if state else None) or eq.home_site_id
-        site = sites.get(site_id) if site_id else None
+        # Named row_site_id, not site_id: the parameter of the same name is the
+        # filter, and shadowing it here silently turned that filter into a no-op.
+        row_site_id = (state.site_id if state else None) or eq.home_site_id
+        site = sites.get(row_site_id) if row_site_id else None
         operator = operators.get(state.operator_id) if state and state.operator_id else None
 
         row = {
@@ -64,7 +66,7 @@ def list_assets(
             "type": eq.type,
             "model": eq.model,
             "status": state.status if state else "AVAILABLE",
-            "site_id": site_id,
+            "site_id": row_site_id,
             "site_name": site.name if site else None,
             "operator_id": state.operator_id if state else None,
             "operator_name": operator.name if operator else None,
@@ -87,7 +89,7 @@ def list_assets(
 
         if status and row["status"] != status.upper():
             continue
-        if site_id and row["site_id"] != site_id:
+        if site_id and row_site_id != site_id:
             continue
         if equipment_type and row["type"].lower() != equipment_type.lower():
             continue

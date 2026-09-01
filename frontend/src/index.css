@@ -176,3 +176,117 @@ body {
 .maplibregl-ctrl-attrib a {
   color: #e8e8e6 !important;
 }
+
+/* ---------------------------------------------------------------------------
+   Mira -- the assistant orb and panel.
+
+   The orb is a real sphere rather than a flat circle: an off-centre radial
+   gradient puts the light source at the upper left, an inner shadow rolls the
+   lower edge away, and the glow underneath reads as the light it casts.
+--------------------------------------------------------------------------- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes miraRise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A slow drift, not a bounce: it should read as present, never as nagging. */
+@keyframes miraFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes miraBreathe {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.14);
+  }
+}
+
+@keyframes miraDot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.mira-orb {
+  background:
+    /* Specular highlight, kept small and high so it reads as a lit sphere
+       without bleaching the label sitting across the middle. */
+    radial-gradient(circle at 31% 19%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.3) 9%, transparent 24%),
+    radial-gradient(circle at 68% 78%, var(--series-7) 0%, transparent 56%),
+    radial-gradient(circle at 40% 30%, var(--seq-400) 0%, var(--accent) 44%, var(--seq-700) 100%);
+  box-shadow:
+    inset 0 -6px 14px rgba(0, 0, 0, 0.42),
+    inset 0 4px 10px rgba(255, 255, 255, 0.22),
+    0 10px 26px rgba(0, 0, 0, 0.34);
+  animation: miraFloat 6s ease-in-out infinite;
+}
+
+.mira-orb:hover {
+  animation-play-state: paused;
+}
+
+/* The cast light. Sits behind the sphere and breathes on its own clock. */
+.mira-halo {
+  background: radial-gradient(circle, var(--accent) 0%, transparent 68%);
+  animation: miraBreathe 4.5s ease-in-out infinite;
+}
+
+.mira-panel {
+  animation: miraRise 0.18s ease-out;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+}
+
+/* The label crosses both the lit and shaded halves of the sphere, so it carries
+   its own shadow rather than relying on the gradient underneath it. */
+.mira-label {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+.mira-dot {
+  animation: miraDot 1.2s ease-in-out infinite;
+}
+
+/* Motion here is decoration; anyone who has asked for less gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  .mira-orb,
+  .mira-halo,
+  .mira-panel,
+  .mira-dot {
+    animation: none;
+  }
+}
