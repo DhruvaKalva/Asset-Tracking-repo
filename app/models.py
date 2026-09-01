@@ -75,6 +75,14 @@ class EventType(str, enum.Enum):
     ALERT_RAISED = "ALERT_RAISED"
     ALERT_ACKNOWLEDGED = "ALERT_ACKNOWLEDGED"
     MAINTENANCE_LOGGED = "MAINTENANCE_LOGGED"
+    PHOTO_ADDED = "PHOTO_ADDED"
+
+
+class PhotoKind(str, enum.Enum):
+    """Which end of a rental a condition photo documents."""
+
+    CHECK_OUT = "CHECK_OUT"
+    CHECK_IN = "CHECK_IN"
 
 
 class Severity(str, enum.Enum):
@@ -231,6 +239,36 @@ class Alert(Base):
     dedupe_key: Mapped[str] = mapped_column(String(128), index=True)
 
     __table_args__ = (Index("ix_alerts_open", "dedupe_key", "resolved_at"),)
+
+
+class AssetPhoto(Base):
+    """Condition evidence captured when a machine leaves and comes back.
+
+    Keyed to a *rental*, not just an asset: the whole point is being able to put
+    this hand-over's photos beside this return's photos and see what changed. An
+    asset-only key would blur every hire together.
+
+    The file itself lives on disk under settings.media_root; only the metadata
+    is stored here. Blobs in the database make backups miserable and buy nothing
+    when a CDN or S3 is the obvious next step.
+    """
+
+    __tablename__ = "asset_photos"
+
+    photo_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    equipment_id: Mapped[str] = mapped_column(String(24), index=True)
+    rental_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    kind: Mapped[str] = mapped_column(String(12), index=True)
+    # Server-generated. The client filename is never trusted or reused.
+    stored_name: Mapped[str] = mapped_column(String(160), unique=True)
+    original_name: Mapped[str | None] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(40))
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    caption: Mapped[str | None] = mapped_column(Text)
+    actor: Mapped[str | None] = mapped_column(String(64))
+    taken_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+    __table_args__ = (Index("ix_photos_asset_kind", "equipment_id", "kind", "taken_at"),)
 
 
 class Forecast(Base):

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # that a demo session never produces an impossible day.
     simulator_hours_per_tick: float = 0.05
 
+    # condition photos captured at check-out / check-in
+    media_root: str = "./media"
+    max_photo_mb: float = 8.0
+
     # business rules
     idle_ratio_threshold: float = 0.70
     idle_streak_days: int = 3
