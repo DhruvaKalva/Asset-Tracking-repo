@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: srts
+      POSTGRES_PASSWORD: srts
+      POSTGRES_DB: smartrental
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U srts"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://srts:srts@db:5432/smartrental
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      SIMULATOR_ENABLED: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

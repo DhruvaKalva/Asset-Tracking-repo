@@ -1,0 +1,15 @@
+# Normalise to LF in the repository; Git checks out native endings on Windows.
+# Without this the first commit from a Windows machine bakes CRLF into every
+# file and every later diff from a Linux collaborator looks like a full rewrite.
+* text=auto eol=lf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.db   binary
+
+# Generated: collapse it in diffs and exclude it from language stats.
+frontend/package-lock.json linguist-generated=true -diff
