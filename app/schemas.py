@@ -300,3 +300,33 @@ class MiraReply(BaseModel):
     tools_used: list[MiraToolCall] = []
     model: str
     usage: dict = {}
+
+
+# --------------------------------------------------------------------------
+# Condition photos
+# --------------------------------------------------------------------------
+class PhotoOut(BaseModel):
+    photo_id: int
+    equipment_id: str
+    rental_id: int | None = None
+    kind: Literal["CHECK_OUT", "CHECK_IN"]
+    url: str
+    original_name: str | None = None
+    content_type: str
+    size_bytes: int
+    caption: str | None = None
+    actor: str | None = None
+    taken_at: datetime
+
+
+class RejectedPhoto(BaseModel):
+    file: str
+    reason: str
+
+
+class PhotoUploadResult(BaseModel):
+    """Partial success is a real outcome here: four good shots and one corrupt
+    file should still record the four."""
+
+    saved: list[PhotoOut] = []
+    rejected: list[RejectedPhoto] = []

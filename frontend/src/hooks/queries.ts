@@ -13,6 +13,7 @@ import type {
   Anomaly,
   Asset,
   AssetDetail,
+  AssetPhoto,
   AssetUsage,
   Breach,
   Equipment,
@@ -26,6 +27,8 @@ import type {
   MiraReply,
   Operator,
   Overview,
+  PhotoKind,
+  PhotoUploadResult,
   Recommendation,
   RegistryCounts,
   Rental,
@@ -312,5 +315,49 @@ export const useMiraHealth = () =>
 export function useMira() {
   return useMutation({
     mutationFn: (messages: MiraMessage[]) => api.post<MiraReply>("/api/mira/chat", { messages }),
+  });
+}
+
+/* -- Condition photos ---------------------------------------------------- */
+
+export const useAssetPhotos = (
+  id: string | undefined,
+  kind?: PhotoKind,
+  /** Scope to one hire. Without it, every rental's photos come back. */
+  rentalId?: number | null,
+) =>
+  useQuery({
+    queryKey: ["photos", id, kind ?? "all", rentalId ?? "any"],
+    queryFn: () =>
+      api.get<AssetPhoto[]>(`/api/assets/${id}/photos${qs({ kind, rental_id: rentalId })}`),
+    enabled: !!id,
+  });
+
+export interface PhotoUpload {
+  equipmentId: string;
+  kind: PhotoKind;
+  files: Blob[];
+  rentalId?: number | null;
+  actor?: string;
+  caption?: string;
+}
+
+export function useUploadPhotos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ equipmentId, kind, files, rentalId, actor, caption }: PhotoUpload) => {
+      const form = new FormData();
+      form.set("kind", kind);
+      if (rentalId != null) form.set("rental_id", String(rentalId));
+      if (actor) form.set("actor", actor);
+      if (caption) form.set("caption", caption);
+      // Repeated field name, which is how FastAPI reads list[UploadFile].
+      files.forEach((f, i) => form.append("files", f, (f as File).name ?? `photo-${i + 1}.jpg`));
+      return api.upload<PhotoUploadResult>(`/api/assets/${equipmentId}/photos`, form);
+    },
+    onSuccess: (_res, vars) => {
+      void qc.invalidateQueries({ queryKey: ["photos", vars.equipmentId] });
+      void qc.invalidateQueries({ queryKey: keys.asset(vars.equipmentId) });
+    },
   });
 }

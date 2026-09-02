@@ -19,8 +19,9 @@ import {
   StatusChip,
   buttonClass,
 } from "@/components/primitives";
-import { useAsset, useAssetUsage, useTrack } from "@/hooks/queries";
+import { useAsset, useAssetPhotos, useAssetUsage, useTrack } from "@/hooks/queries";
 import { usePlayback } from "@/store/ui";
+import type { AssetPhoto } from "@/lib/types";
 import { dueLabel, formatDate, formatDateTime, hours, money, num, pct, timeAgo, titleCase } from "@/lib/format";
 
 const WINDOWS = [6, 24, 72, 168];
@@ -30,6 +31,7 @@ export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const detail = useAsset(id);
   const usage = useAssetUsage(id, 30);
+  const photos = useAssetPhotos(id);
   const { playing, cursor, speed, windowHours, setPlaying, setCursor, setSpeed, setWindowHours, reset } = usePlayback();
   const track = useTrack(id, windowHours);
 
@@ -237,6 +239,30 @@ export default function AssetDetailPage() {
         </Card>
       </div>
 
+      <Card
+        title={`Condition photos (${photos.data?.length ?? 0})`}
+        subtitle="Out and back, side by side — the pair a damage claim is settled on"
+      >
+        {photos.isLoading ? (
+          <Spinner />
+        ) : (photos.data ?? []).length === 0 ? (
+          <Empty>
+            No photos yet. They are captured on the Check In/Out page when this asset changes hands.
+          </Empty>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <PhotoSet
+              label="Going out"
+              rows={(photos.data ?? []).filter((p) => p.kind === "CHECK_OUT")}
+            />
+            <PhotoSet
+              label="Coming back"
+              rows={(photos.data ?? []).filter((p) => p.kind === "CHECK_IN")}
+            />
+          </div>
+        )}
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title={`Open alerts (${alerts.length})`} bodyClassName="p-0">
           {alerts.length === 0 ? (
@@ -341,6 +367,43 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs text-ink-muted">{label}</span>
       <span className="tnum text-sm text-ink">{value}</span>
+    </div>
+  );
+}
+
+/** One end of a handover. Kept side by side so the comparison is the layout. */
+function PhotoSet({ label, rows }: { label: string; rows: AssetPhoto[] }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <span className="text-xs font-medium text-ink">{label}</span>
+        <span className="text-[11px] text-ink-muted tnum">{rows.length}</span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-hair px-3 py-4 text-center text-[11px] text-ink-muted">
+          None recorded
+        </p>
+      ) : (
+        <ul className="grid grid-cols-3 gap-2">
+          {rows.map((p) => (
+            <li key={p.photo_id}>
+              {/* Opens the full-size original; the thumbnail is a crop. */}
+              <a href={p.url} target="_blank" rel="noreferrer" title={p.caption ?? undefined}>
+                <img
+                  src={p.url}
+                  alt={p.caption ?? p.original_name ?? `photo ${p.photo_id}`}
+                  loading="lazy"
+                  className="aspect-square w-full rounded-lg border border-hair object-cover transition-opacity hover:opacity-80"
+                />
+              </a>
+              <p className="mt-1 truncate text-[10px] text-ink-muted" title={formatDateTime(p.taken_at)}>
+                {timeAgo(p.taken_at)}
+                {p.actor ? ` · ${p.actor}` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

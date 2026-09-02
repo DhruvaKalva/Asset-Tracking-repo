@@ -9,10 +9,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, ErrorNote, Field, Spinner, buttonClass, inputClass, primaryButtonClass } from "@/components/primitives";
-import { useCheckIn, useCheckOut, useOperators, useResolveScan, useSites } from "@/hooks/queries";
+import {
+  useAssetPhotos,
+  useAssets,
+  useCheckIn,
+  useCheckOut,
+  useOperators,
+  useResolveScan,
+  useSites,
+  useUploadPhotos,
+} from "@/hooks/queries";
+import { PhotoCapture, type StagedPhoto } from "@/components/PhotoCapture";
+import { PhotoCompare, fromStored, type ComparePhoto } from "@/components/PhotoCompare";
 import { useAuth } from "@/store/auth";
 import { formatDate } from "@/lib/format";
-import type { Rental } from "@/lib/types";
+import type { PhotoUploadResult, Rental } from "@/lib/types";
 
 function newKey(): string {
   return crypto.randomUUID();
@@ -27,15 +38,19 @@ export default function ScanPage() {
   const [notes, setNotes] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(newKey);
   const [result, setResult] = useState<Rental | null>(null);
+  const [photos, setPhotos] = useState<StagedPhoto[]>([]);
+  const [photoResult, setPhotoResult] = useState<PhotoUploadResult | null>(null);
 
   const sites = useSites();
   const operators = useOperators();
   const resolve = useResolveScan();
   const checkOut = useCheckOut();
   const checkIn = useCheckIn();
+  const uploadPhotos = useUploadPhotos();
+  const assets = useAssets({});
   const user = useAuth((s) => s.user);
 
-  const pending = checkOut.isPending || checkIn.isPending;
+  const pending = checkOut.isPending || checkIn.isPending || uploadPhotos.isPending;
   const error = checkOut.error ?? checkIn.error;
 
   // Preview what the scan resolved to, the way the scanner screen does.
@@ -49,6 +64,46 @@ export default function ScanPage() {
   }, [scan]);
 
   const resolved = resolve.data;
+
+  /**
+   * A default payload for check-in.
+   *
+   * Check-in only succeeds against an asset that is actually out, so the
+   * default is drawn from the live fleet rather than hard-coded -- a static
+   * example would fail the moment that machine came back.
+   */
+  const onRent = useMemo(
+    () => (assets.data ?? []).find((a) => a.rental_id != null),
+    [assets.data],
+  );
+  const defaultPayload = onRent ? `CAT-QR-${onRent.equipment_id}` : "";
+
+  useEffect(() => {
+    // Only when arriving at check-in with an empty field. `scan` is not a
+    // dependency on purpose: refilling as the user clears it would trap them.
+    if (mode === "in" && defaultPayload) setScan((cur) => cur || defaultPayload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, defaultPayload]);
+
+  // The hire being returned, so the comparison shows this handover's photos
+  // rather than every check-out this machine has ever had.
+  const returning = useMemo(
+    () => (assets.data ?? []).find((a) => a.equipment_id === resolved?.equipment_id),
+    [assets.data, resolved?.equipment_id],
+  );
+
+  const outPhotos = useAssetPhotos(
+    mode === "in" ? resolved?.equipment_id : undefined,
+    "CHECK_OUT",
+    returning?.rental_id ?? undefined,
+  );
+
+  const stagedForCompare: ComparePhoto[] = photos.map((ph) => ({
+    key: ph.id,
+    src: ph.preview,
+    label: ph.name,
+    sub: ph.source === "camera" ? "just captured" : "from file",
+  }));
   const canSubmit = useMemo(
     () => scan.trim().length > 0 && (mode === "in" || siteId.length > 0) && !pending,
     [scan, mode, siteId, pending],
@@ -64,6 +119,29 @@ export default function ScanPage() {
       setIdempotencyKey(newKey()); // fresh key only after a real success
       setScan("");
       setNotes("");
+
+      // Photos go up only now, because only now is there a rental to attach
+      // them to. The handover is already recorded either way -- a failed upload
+      // must not read as a failed check-in.
+      if (photos.length > 0) {
+        uploadPhotos.mutate(
+          {
+            equipmentId: rental.equipment_id,
+            kind: mode === "out" ? "CHECK_OUT" : "CHECK_IN",
+            rentalId: rental.rental_id,
+            files: photos.map((p) => p.blob),
+            actor: user?.name,
+            caption: notes || undefined,
+          },
+          {
+            onSuccess: (res) => {
+              setPhotoResult(res);
+              photos.forEach((p) => URL.revokeObjectURL(p.preview));
+              setPhotos([]);
+            },
+          },
+        );
+      }
     };
 
     if (mode === "out") {
@@ -87,7 +165,14 @@ export default function ScanPage() {
         {(["out", "in"] as const).map((m) => (
           <button
             key={m}
-            onClick={() => setMode(m)}
+            onClick={() => {
+              setMode(m);
+              setPhotoResult(null);
+              // Photos staged for a check-out must not silently become
+              // check-in evidence, so switching ends discards them.
+              photos.forEach((ph) => URL.revokeObjectURL(ph.preview));
+              setPhotos([]);
+            }}
             className={
               "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
               (mode === m ? "bg-[var(--accent)] text-white" : "text-ink-2 hover:text-ink")
@@ -157,13 +242,59 @@ export default function ScanPage() {
             <input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
           </Field>
 
+          <Field label={mode === "out" ? "Condition photos going out" : "Condition photos coming back"}>
+            <PhotoCapture
+              key={mode}
+              photos={photos}
+              onChange={setPhotos}
+              disabled={pending}
+              // In check-in the comparison below shows the staged set already.
+              showStrip={mode === "out"}
+            />
+            <p className="mt-1.5 text-[11px] leading-snug text-ink-muted">
+              {mode === "out"
+                ? "Shot now, these are the record of how the machine left. Compare them against the return set to settle a damage claim."
+                : "Photograph anything that changed. The two sets sit side by side below."}
+            </p>
+          </Field>
+
+          {mode === "in" && resolved && (
+            <div className="rounded-lg border border-hair bg-raised p-3">
+              <div className="mb-2.5 flex items-baseline justify-between gap-2">
+                <span className="text-xs font-medium text-ink">
+                  Condition check — {resolved.equipment_id}
+                </span>
+                {returning?.rental_id && (
+                  <span className="text-[11px] text-ink-muted tnum">
+                    rental #{returning.rental_id}
+                  </span>
+                )}
+              </div>
+              <PhotoCompare
+                leftLabel="How it went out"
+                rightLabel="How it came back"
+                left={fromStored(outPhotos.data ?? [])}
+                right={stagedForCompare}
+                loading={outPhotos.isLoading}
+                leftEmpty="No photos were taken when this machine went out."
+                rightEmpty="Capture or upload the return photos above."
+              />
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3 pt-1">
             <p className="text-[11px] leading-snug text-ink-muted">
               Idempotency key <code className="text-ink-2">{idempotencyKey.slice(0, 8)}…</code> — a retry of this
               submission returns the same rental instead of creating a second one.
             </p>
             <button type="submit" className={primaryButtonClass} disabled={!canSubmit}>
-              {pending ? "Submitting…" : mode === "out" ? "Check out" : "Check in"}
+              {uploadPhotos.isPending
+                ? "Uploading photos…"
+                : pending
+                  ? "Submitting…"
+                  : mode === "out"
+                    ? "Check out"
+                    : "Check in"}
             </button>
           </div>
         </form>
@@ -182,6 +313,44 @@ export default function ScanPage() {
             {result.actual_check_in_date && <Row label="Returned" value={formatDate(result.actual_check_in_date)} />}
             <Row label="Status" value={result.status} />
           </div>
+          {photoResult && (
+            <div className="mt-3 border-t border-hair pt-3">
+              <p className="text-xs text-ink-2">
+                {photoResult.saved.length} photo{photoResult.saved.length === 1 ? "" : "s"} attached to
+                rental #{result.rental_id}
+              </p>
+              {photoResult.saved.length > 0 && (
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {photoResult.saved.map((ph) => (
+                    <li key={ph.photo_id}>
+                      <img
+                        src={ph.url}
+                        alt={ph.original_name ?? `photo ${ph.photo_id}`}
+                        className="h-14 w-14 rounded-lg border border-hair object-cover"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {photoResult.rejected.length > 0 && (
+                <ul className="mt-2 space-y-0.5">
+                  {photoResult.rejected.map((r) => (
+                    <li key={r.file} className="text-[11px] leading-snug text-warning">
+                      {r.file} — {r.reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {uploadPhotos.isError && (
+            <p className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-2 text-xs leading-snug text-warning">
+              The {mode === "out" ? "check-out" : "check-in"} was recorded, but the photos did not
+              upload: {(uploadPhotos.error as Error).message}
+            </p>
+          )}
+
           <Link to={`/assets/${result.equipment_id}`} className={buttonClass + " mt-3"}>
             Open asset →
           </Link>

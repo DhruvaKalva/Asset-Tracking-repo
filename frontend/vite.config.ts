@@ -25,6 +25,9 @@ export default defineConfig({
         },
       },
       "/health": { target: process.env.VITE_PROXY_TARGET ?? "http://127.0.0.1:8000", changeOrigin: true },
+      // Condition photos are served off the API's disk. Without this the dev
+      // server answers with index.html and every <img> renders broken.
+      "/media": { target: process.env.VITE_PROXY_TARGET ?? "http://127.0.0.1:8000", changeOrigin: true },
     },
   },
 });

@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.adapters.bus import bus
 from app.api import (
@@ -21,6 +22,7 @@ from app.api import (
     analytics,
     assets,
     mira,
+    photos,
     registry,
     rentals,
     stream,
@@ -30,6 +32,7 @@ from app.api import (
 from app.config import settings
 from app.db import SessionLocal, init_db
 from app.domain import mira as mira_domain
+from app.domain import photos as photo_store
 from app.domain.errors import DomainError
 from app.workers import scheduler
 
@@ -106,6 +109,13 @@ app.include_router(analytics.router, prefix=API)
 app.include_router(admin.router, prefix=API)
 app.include_router(stream.router, prefix=API)
 app.include_router(mira.router, prefix=API)
+app.include_router(photos.router, prefix=API)
+
+
+# Condition photos are served straight off disk. In production this is the
+# reverse proxy's job -- it is here so a single `uvicorn app.main:app` still
+# renders the images with nothing else running.
+app.mount("/media", StaticFiles(directory=str(photo_store.media_root())), name="media")
 
 
 @app.get("/health")

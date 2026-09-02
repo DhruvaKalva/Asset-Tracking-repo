@@ -34,7 +34,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      // Only a string body is JSON. FormData must set its own header, because
+      // the browser has to append the multipart boundary to it.
+      ...(typeof init?.body === "string" ? { "Content-Type": "application/json" } : {}),
       ...authHeader(),
       ...init?.headers,
     },
@@ -82,6 +84,8 @@ export const api = {
     request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PATCH", body: body === undefined ? undefined : JSON.stringify(body) }),
+  /** Multipart POST, for camera captures and picked files. */
+  upload: <T>(path: string, form: FormData) => request<T>(path, { method: "POST", body: form }),
 };
 
 /** Absolute URL for the SSE endpoint (EventSource cannot take custom headers). */

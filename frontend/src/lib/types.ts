@@ -408,3 +408,32 @@ export interface MiraHealth {
   model: string | null;
   tools: string[];
 }
+
+/* -- Condition photos, captured at check-out and check-in ---------------- */
+
+export type PhotoKind = "CHECK_OUT" | "CHECK_IN";
+
+export interface AssetPhoto {
+  photo_id: number;
+  equipment_id: string;
+  rental_id: number | null;
+  kind: PhotoKind;
+  /** Server path under /media, already proxied in dev. */
+  url: string;
+  original_name: string | null;
+  content_type: string;
+  size_bytes: number;
+  caption: string | null;
+  actor: string | null;
+  taken_at: string;
+}
+
+export interface RejectedPhoto {
+  file: string;
+  reason: string;
+}
+
+export interface PhotoUploadResult {
+  saved: AssetPhoto[];
+  rejected: RejectedPhoto[];
+}
